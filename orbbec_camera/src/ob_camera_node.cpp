@@ -1,4 +1,9 @@
 /*******************************************************************************
+ * NOTE: This file has been modified by Blue Sky Robotics
+ * to support streaming of raw H265 data.
+ *******************************************************************************/
+
+/*******************************************************************************
  * Copyright (c) 2023 Orbbec 3D Technology, Inc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -2579,6 +2584,17 @@ void OBCameraNode::setupPublishers() {
     camera_info_publishers_[stream_index] = node_->create_publisher<CameraInfo>(
         topic, rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(camera_info_qos_profile),
                            camera_info_qos_profile));
+    topic = name + "/h26x_encoded_data";
+    auto image_h26x_qos_profile = getRMWQosProfileFromString(image_qos);
+    if (use_intra_process_) {
+      image_h26x_qos_profile = rmw_qos_profile_default;
+    }
+    if (format_str_[stream_index] == "H264" || format_str_[stream_index] == "H265") {
+      camera_h26x_publishers_[stream_index] =
+          node_->create_publisher<sensor_msgs::msg::CompressedImage>(
+              topic, rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(image_h26x_qos_profile),
+                                 image_h26x_qos_profile));
+    }
     if (isPublishMetaData(pid_)) {
       metadata_publishers_[stream_index] =
           node_->create_publisher<orbbec_camera_msgs::msg::Metadata>(
@@ -3471,6 +3487,10 @@ bool OBCameraNode::decodeColorFrameToBuffer(const std::shared_ptr<ob::Frame> &fr
   if (image_publishers_.count(stream_index) && image_publishers_[stream_index]) {
     has_subscriber = image_publishers_[stream_index]->get_subscription_count() > 0;
   }
+  if (camera_h26x_publishers_.count(stream_index) && camera_h26x_publishers_[stream_index] &&
+      camera_h26x_publishers_[stream_index]->get_subscription_count() > 0) {
+    has_subscriber = true;
+  }
 
   if (frame->getType() == OB_FRAME_COLOR && enable_colored_point_cloud_ &&
       depth_registration_cloud_pub_ &&
@@ -3526,7 +3546,8 @@ bool OBCameraNode::decodeColorFrameToBuffer(const std::shared_ptr<ob::Frame> &fr
     }
   }
 #endif
-  if (!is_decoded) {
+  if (!is_decoded &&
+      !(frame->getFormat() == OB_FORMAT_H264 || frame->getFormat() == OB_FORMAT_H265)) {
     auto video_frame = softwareDecodeColorFrame(frame, stream_index);
     if (!video_frame) {
       RCLCPP_ERROR_STREAM(logger_, "Failed to convert frame to video frame");
@@ -3586,6 +3607,10 @@ void OBCameraNode::onNewFrameCallback(const std::shared_ptr<ob::Frame> &frame,
   has_subscriber =
       has_subscriber || (metadata_publishers_.count(stream_index) &&
                          metadata_publishers_[stream_index]->get_subscription_count() > 0);
+  has_subscriber =
+      has_subscriber || (camera_h26x_publishers_.count(stream_index) &&
+                         camera_h26x_publishers_[stream_index] &&
+                         camera_h26x_publishers_[stream_index]->get_subscription_count() > 0);
   if (!has_subscriber) {
     return;
   }
@@ -3704,7 +3729,11 @@ void OBCameraNode::onNewFrameCallback(const std::shared_ptr<ob::Frame> &frame,
   camera_info_publishers_[stream_index]->publish(camera_info);
   publishMetadata(frame, stream_index, camera_info.header);
   CHECK_NOTNULL(image_publishers_[stream_index]);
-  if (image_publishers_[stream_index]->get_subscription_count() == 0) {
+  bool has_image_subscriber = image_publishers_[stream_index]->get_subscription_count() > 0;
+  bool has_h26x_subscriber =
+      camera_h26x_publishers_.count(stream_index) && camera_h26x_publishers_[stream_index] &&
+      camera_h26x_publishers_[stream_index]->get_subscription_count() > 0;
+  if (!has_image_subscriber && !has_h26x_subscriber) {
     return;
   }
   if (image.empty() || image.cols != width || image.rows != height) {
@@ -3720,6 +3749,23 @@ void OBCameraNode::onNewFrameCallback(const std::shared_ptr<ob::Frame> &frame,
   }
   if (frame->getType() == OB_FRAME_COLOR_RIGHT && !is_right_color_frame_decoded_) {
     RCLCPP_ERROR(logger_, "right color frame is not decoded");
+    return;
+  }
+  if (frame->getType() == OB_FRAME_COLOR &&
+      (frame->getFormat() == OB_FORMAT_H264 || frame->getFormat() == OB_FORMAT_H265)) {
+    if (has_h26x_subscriber) {
+      auto h26x_publisher = camera_h26x_publishers_[stream_index];
+      sensor_msgs::msg::CompressedImage h26x_image_msg;
+      h26x_image_msg.header.stamp = timestamp;
+      h26x_image_msg.header.frame_id = frame_id;
+      h26x_image_msg.format = frame->getFormat() == OB_FORMAT_H264 ? "h264" : "h265";
+      h26x_image_msg.data.resize(video_frame->getDataSize());
+      memcpy(h26x_image_msg.data.data(), video_frame->getData(), video_frame->getDataSize());
+      h26x_publisher->publish(std::move(h26x_image_msg));
+    }
+    return;
+  }
+  if (!has_image_subscriber) {
     return;
   }
   if (frame->getType() == OB_FRAME_COLOR && frame->format() != OB_FORMAT_Y8 &&

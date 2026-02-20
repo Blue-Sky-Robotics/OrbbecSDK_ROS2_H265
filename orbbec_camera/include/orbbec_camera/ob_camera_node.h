@@ -1,4 +1,9 @@
 /*******************************************************************************
+ * NOTE: This file has been modified by Blue Sky Robotics
+ * to support streaming of raw H265 data.
+ *******************************************************************************/
+
+/*******************************************************************************
  * Copyright (c) 2023 Orbbec 3D Technology, Inc
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,6 +44,7 @@
 #include <diagnostic_updater/diagnostic_updater.hpp>
 
 #include <sensor_msgs/msg/camera_info.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <camera_info_manager/camera_info_manager.hpp>
 
 #include <image_publisher/image_publisher.hpp>
@@ -561,6 +567,8 @@ class OBCameraNode {
   std::map<stream_index_pair, int> rotation_stream_;
   std::map<stream_index_pair, std::string> stream_name_;
   std::map<stream_index_pair, std::shared_ptr<image_publisher>> image_publishers_;
+  std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr>
+      camera_h26x_publishers_;
   std::map<stream_index_pair, rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr>
       camera_info_publishers_;
 

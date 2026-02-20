@@ -4,6 +4,8 @@
 
 ## Introduction
 
+**NOTE: This is a modification of the main OrbbecSDK_ROS2 repository, to support streaming of raw H265 data.**
+
 The **OrbbecSDK ROS2 Wrapper** provides seamless integration of Orbbec cameras with the ROS 2 ecosystem.
  It supports ROS2 **Foxy**, **Humble**, and **Jazzy** distributions.
 
