@@ -124,12 +124,16 @@ def generate_launch_description():
         DeclareLaunchArgument("force_ip_address", default_value="192.168.1.10"),  # Static IP address to assign
         DeclareLaunchArgument("force_ip_subnet_mask", default_value="255.255.255.0"),  # Subnet mask used for static IP
         DeclareLaunchArgument("force_ip_gateway", default_value="192.168.1.1"),  # Gateway address used for static IP
-
+        # Launch-only: forwarded as process argv, not as a node parameter
+        DeclareLaunchArgument("run_arguments", default_value=""),
     ]
-    DeclareLaunchArgument("run_arguments", default_value="")
 
     # Node configuration
-    parameters = [{arg.name: LaunchConfiguration(arg.name)} for arg in args]
+    parameters = [
+        {arg.name: LaunchConfiguration(arg.name)}
+        for arg in args
+        if arg.name != "run_arguments"
+    ]
     # get  ROS_DISTRO
     ros_distro = os.environ["ROS_DISTRO"]
     if ros_distro == "foxy":
@@ -156,7 +160,6 @@ def generate_launch_description():
             name=LaunchConfiguration("camera_name"),
             namespace="",
             parameters=parameters,
-            arguments=[LaunchConfiguration("run_arguments")],
         )
         # Define the ComposableNodeContainer
         container = ComposableNodeContainer(
