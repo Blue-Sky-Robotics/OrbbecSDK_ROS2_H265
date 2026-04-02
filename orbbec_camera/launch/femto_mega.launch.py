@@ -2,11 +2,12 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import PushRosNamespace
-from launch.actions import GroupAction
+from launch.actions import GroupAction, OpaqueFunction
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch_ros.actions import Node
 import os
+import shlex
 
 
 def generate_launch_description():
@@ -134,12 +135,11 @@ def generate_launch_description():
         for arg in args
         if arg.name != "run_arguments"
     ]
-    # get  ROS_DISTRO
-    ros_distro = os.environ["ROS_DISTRO"]
-    if ros_distro == "foxy":
-        return LaunchDescription(
-            args
-            + [
+
+    def _launch_camera(context):
+        argv = shlex.split(context.launch_configurations.get("run_arguments", ""))
+        if os.environ["ROS_DISTRO"] == "foxy":
+            return [
                 Node(
                     package="orbbec_camera",
                     executable="orbbec_camera_node",
@@ -147,13 +147,9 @@ def generate_launch_description():
                     namespace=LaunchConfiguration("camera_name"),
                     parameters=parameters,
                     output="log",
-                    arguments=[LaunchConfiguration("run_arguments")],
+                    arguments=argv,
                 )
             ]
-        )
-    # Define the ComposableNode
-    else:
-        # Define the ComposableNode
         compose_node = ComposableNode(
             package="orbbec_camera",
             plugin="orbbec_camera::OBCameraNodeDriver",
@@ -167,19 +163,14 @@ def generate_launch_description():
             namespace="",
             package="rclcpp_components",
             executable="component_container",
-            composable_node_descriptions=[
-                compose_node,
-            ],
+            composable_node_descriptions=[compose_node],
             output="log",
-            arguments=[LaunchConfiguration("run_arguments")],
+            arguments=argv,
         )
-        # Launch description
-        ld = LaunchDescription(
-            args
-            + [
-                GroupAction(
-                    [PushRosNamespace(LaunchConfiguration("camera_name")), container]
-                )
-            ]
-        )
-        return ld
+        return [
+            GroupAction(
+                [PushRosNamespace(LaunchConfiguration("camera_name")), container]
+            )
+        ]
+
+    return LaunchDescription(args + [OpaqueFunction(function=_launch_camera)])
