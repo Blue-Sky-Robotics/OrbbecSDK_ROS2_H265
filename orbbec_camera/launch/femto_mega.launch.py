@@ -126,6 +126,7 @@ def generate_launch_description():
         DeclareLaunchArgument("force_ip_gateway", default_value="192.168.1.1"),  # Gateway address used for static IP
 
     ]
+    DeclareLaunchArgument("run_arguments", default_value="")
 
     # Node configuration
     parameters = [{arg.name: LaunchConfiguration(arg.name)} for arg in args]
@@ -142,6 +143,7 @@ def generate_launch_description():
                     namespace=LaunchConfiguration("camera_name"),
                     parameters=parameters,
                     output="log",
+                    arguments=[LaunchConfiguration("run_arguments")],
                 )
             ]
         )
@@ -154,6 +156,7 @@ def generate_launch_description():
             name=LaunchConfiguration("camera_name"),
             namespace="",
             parameters=parameters,
+            arguments=[LaunchConfiguration("run_arguments")],
         )
         # Define the ComposableNodeContainer
         container = ComposableNodeContainer(
@@ -165,6 +168,7 @@ def generate_launch_description():
                 compose_node,
             ],
             output="log",
+            arguments=[LaunchConfiguration("run_arguments")],
         )
         # Launch description
         ld = LaunchDescription(
