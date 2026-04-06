@@ -1,11 +1,14 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import (
+    DeclareLaunchArgument,
+    OpaqueFunction,
+    RegisterEventHandler,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessStart
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import PushRosNamespace
-from launch.actions import GroupAction, OpaqueFunction
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import LoadComposableNodes, Node
 from launch_ros.descriptions import ComposableNode
-from launch_ros.actions import Node
 import os
 import shlex
 
@@ -74,9 +77,6 @@ def generate_launch_description():
         DeclareLaunchArgument("tf_publish_rate", default_value="0.0"),
         DeclareLaunchArgument("ir_info_url", default_value=""),
         DeclareLaunchArgument("color_info_url", default_value=""),
-        # Network device settings: default enumerate_net_device is set to true, which will automatically enumerate network devices
-        # If you do not want to automatically enumerate network devices,
-        # you can set enumerate_net_device to false, net_device_ip to the device's IP address, and net_device_port to the default value of 8090
         DeclareLaunchArgument("enumerate_net_device", default_value="true"),
         DeclareLaunchArgument("net_device_ip", default_value=""),
         DeclareLaunchArgument("net_device_port", default_value="0"),
@@ -85,22 +85,22 @@ def generate_launch_description():
         DeclareLaunchArgument("enable_publish_extrinsic", default_value="false"),
         DeclareLaunchArgument("enable_d2c_viewer", default_value="false"),
         DeclareLaunchArgument("enable_ldp", default_value="true"),
-        DeclareLaunchArgument('enable_noise_removal_filter', default_value='false'),
-        DeclareLaunchArgument('enable_decimation_filter', default_value='false'),
-        DeclareLaunchArgument('enable_spatial_filter', default_value='false'),
-        DeclareLaunchArgument('enable_temporal_filter', default_value='false'),
-        DeclareLaunchArgument('enable_hole_filling_filter', default_value='false'),
+        DeclareLaunchArgument("enable_noise_removal_filter", default_value="false"),
+        DeclareLaunchArgument("enable_decimation_filter", default_value="false"),
+        DeclareLaunchArgument("enable_spatial_filter", default_value="false"),
+        DeclareLaunchArgument("enable_temporal_filter", default_value="false"),
+        DeclareLaunchArgument("enable_hole_filling_filter", default_value="false"),
         DeclareLaunchArgument("enable_threshold_filter", default_value="false"),
-        DeclareLaunchArgument('noise_removal_filter_min_diff', default_value='10'),
-        DeclareLaunchArgument('noise_removal_filter_max_size', default_value='50'),
-        DeclareLaunchArgument('decimation_filter_scale', default_value='-1'),
-        DeclareLaunchArgument('spatial_filter_alpha', default_value='-1.0'),
-        DeclareLaunchArgument('spatial_filter_diff_threshold', default_value='-1'),
-        DeclareLaunchArgument('spatial_filter_magnitude', default_value='-1'),
-        DeclareLaunchArgument('spatial_filter_radius', default_value='-1'),
-        DeclareLaunchArgument('temporal_filter_diff_threshold', default_value='-1.0'),
-        DeclareLaunchArgument('temporal_filter_weight', default_value='-1.0'),
-        DeclareLaunchArgument('hole_filling_filter_mode', default_value=''),
+        DeclareLaunchArgument("noise_removal_filter_min_diff", default_value="10"),
+        DeclareLaunchArgument("noise_removal_filter_max_size", default_value="50"),
+        DeclareLaunchArgument("decimation_filter_scale", default_value="-1"),
+        DeclareLaunchArgument("spatial_filter_alpha", default_value="-1.0"),
+        DeclareLaunchArgument("spatial_filter_diff_threshold", default_value="-1"),
+        DeclareLaunchArgument("spatial_filter_magnitude", default_value="-1"),
+        DeclareLaunchArgument("spatial_filter_radius", default_value="-1"),
+        DeclareLaunchArgument("temporal_filter_diff_threshold", default_value="-1.0"),
+        DeclareLaunchArgument("temporal_filter_weight", default_value="-1.0"),
+        DeclareLaunchArgument("hole_filling_filter_mode", default_value=""),
         DeclareLaunchArgument("threshold_filter_max", default_value="-1"),
         DeclareLaunchArgument("threshold_filter_min", default_value="-1"),
         DeclareLaunchArgument("sync_mode", default_value="standalone"),
@@ -113,23 +113,23 @@ def generate_launch_description():
         DeclareLaunchArgument("ordered_pc", default_value="false"),
         DeclareLaunchArgument("enable_depth_scale", default_value="true"),
         DeclareLaunchArgument("align_mode", default_value="HW"),
-        DeclareLaunchArgument('align_target_stream', default_value='COLOR'),# COLOR or DEPTH
+        DeclareLaunchArgument("align_target_stream", default_value="COLOR"),  # COLOR or DEPTH
         DeclareLaunchArgument("laser_energy_level", default_value="-1"),
         DeclareLaunchArgument("enable_heartbeat", default_value="false"),
         DeclareLaunchArgument("time_domain", default_value="global"),
-        DeclareLaunchArgument('device_preset', default_value='Custom'),
+        DeclareLaunchArgument("device_preset", default_value="Custom"),
 
         # Force IP parameters
-        DeclareLaunchArgument("force_ip_enable", default_value="false"),  # Whether to enable Force IP function
-        DeclareLaunchArgument("force_ip_mac", default_value=""),  # If multiple cameras are connected, specify target MAC (e.g. "54:14:FD:06:07:DA")
-        DeclareLaunchArgument("force_ip_address", default_value="192.168.1.10"),  # Static IP address to assign
-        DeclareLaunchArgument("force_ip_subnet_mask", default_value="255.255.255.0"),  # Subnet mask used for static IP
-        DeclareLaunchArgument("force_ip_gateway", default_value="192.168.1.1"),  # Gateway address used for static IP
+        DeclareLaunchArgument("force_ip_enable", default_value="false"),
+        DeclareLaunchArgument("force_ip_mac", default_value=""),
+        DeclareLaunchArgument("force_ip_address", default_value="192.168.1.10"),
+        DeclareLaunchArgument("force_ip_subnet_mask", default_value="255.255.255.0"),
+        DeclareLaunchArgument("force_ip_gateway", default_value="192.168.1.1"),
+
         # Launch-only: forwarded as process argv, not as a node parameter
         DeclareLaunchArgument("run_arguments", default_value=""),
     ]
 
-    # Node configuration
     parameters = [
         {arg.name: LaunchConfiguration(arg.name)}
         for arg in args
@@ -138,7 +138,10 @@ def generate_launch_description():
 
     def _launch_camera(context):
         argv = shlex.split(context.launch_configurations.get("run_arguments", ""))
-        if os.environ["ROS_DISTRO"] == "foxy":
+        camera_name = context.launch_configurations.get("camera_name", "camera")
+        ros_distro = os.environ["ROS_DISTRO"].lower()
+
+        if ros_distro == "foxy":
             return [
                 Node(
                     package="orbbec_camera",
@@ -146,31 +149,56 @@ def generate_launch_description():
                     name="ob_camera_node",
                     namespace=LaunchConfiguration("camera_name"),
                     parameters=parameters,
-                    output="log",
+                    output="screen",
                     arguments=argv,
+                    respawn=True,
+                    respawn_delay=2.0,
                 )
             ]
+
         compose_node = ComposableNode(
             package="orbbec_camera",
             plugin="orbbec_camera::OBCameraNodeDriver",
             name=LaunchConfiguration("camera_name"),
-            namespace="",
+            namespace=LaunchConfiguration("camera_name"),
             parameters=parameters,
         )
-        # Define the ComposableNodeContainer
-        container = ComposableNodeContainer(
-            name="camera_container",
-            namespace="",
+
+        container = Node(
             package="rclcpp_components",
             executable="component_container",
+<<<<<<< Updated upstream
             composable_node_descriptions=[compose_node],
             output="log",
             arguments=argv,
+=======
+            name="camera_container",
+            namespace=LaunchConfiguration("camera_name"),
+            output="screen",
+            arguments=argv,
+            respawn=True,
+            respawn_delay=2.0,
+>>>>>>> Stashed changes
         )
+
+        load_camera = LoadComposableNodes(
+            target_container=f"/{camera_name}/camera_container",
+            composable_node_descriptions=[compose_node],
+        )
+
         return [
-            GroupAction(
-                [PushRosNamespace(LaunchConfiguration("camera_name")), container]
-            )
+            container,
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=container,
+                    on_start=[
+                        TimerAction(
+                            period=1.0,
+                            actions=[load_camera],
+                        )
+                    ],
+                )
+            ),
         ]
 
     return LaunchDescription(args + [OpaqueFunction(function=_launch_camera)])
