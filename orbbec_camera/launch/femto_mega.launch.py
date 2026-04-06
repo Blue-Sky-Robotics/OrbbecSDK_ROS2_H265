@@ -167,18 +167,12 @@ def generate_launch_description():
         container = Node(
             package="rclcpp_components",
             executable="component_container",
-<<<<<<< Updated upstream
-            composable_node_descriptions=[compose_node],
-            output="log",
-            arguments=argv,
-=======
             name="camera_container",
             namespace=LaunchConfiguration("camera_name"),
             output="screen",
             arguments=argv,
             respawn=True,
             respawn_delay=2.0,
->>>>>>> Stashed changes
         )
 
         load_camera = LoadComposableNodes(
