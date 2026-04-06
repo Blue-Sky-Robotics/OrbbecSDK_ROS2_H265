@@ -164,8 +164,10 @@ def generate_launch_description():
             package="rclcpp_components",
             executable="component_container",
             composable_node_descriptions=[compose_node],
-            output="log",
+            output="screen",
             arguments=argv,
+            respawn=True,
+            respawn_delay=2,
         )
         return [
             GroupAction(
